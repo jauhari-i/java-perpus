@@ -166,6 +166,44 @@ public class Controller {
     }
   }
 
+  public class RedirectFormPeminjaman implements ActionListener {
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      ArrayList<Buku> bukuList = GetArrayListBuku();
+      ArrayList<Anggota> anggotaList = GetArrayListAnggota();
+      JPanel formPeminjamanPanel = dashboard.getFormPeminjamanPanel(anggotaList, bukuList,
+          new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+              int anggotaId = findAnggotaIdByName(anggotaList, dashboard.getNamaPeminjam());
+              int bukuId = findBukuIdByName(bukuList, dashboard.getNamaBukuPeminjaman());
+
+              java.util.Date utilDate = dashboard.getTanggalPinjam();
+              java.sql.Date sqlDate = new java.sql.Date(utilDate.getTime());
+
+              AddPeminjaman(anggotaId, bukuId, dashboard.getDurasiPeminjaman(), sqlDate);
+
+            }
+          });
+      dashboard.getFrame().getContentPane().removeAll();
+      dashboard.getFrame().setContentPane(formPeminjamanPanel);
+      dashboard.getFrame().revalidate();
+      dashboard.getFrame().repaint();
+    }
+
+  }
+
+  public class RedirectEditPeminjaman implements ActionListener {
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      String selectedValue = e.getActionCommand();
+      int idPeminjaman = Integer.parseInt(selectedValue);
+      GetPeminjamanById(idPeminjaman);
+    }
+  }
+
   private Connection conn;
 
   Buku buku = new Buku(0, "", "", "", "");
@@ -203,6 +241,7 @@ public class Controller {
     dashboard.addActionListenerListBuku(new RedirectListBuku());
     dashboard.addActionListenerFormBuku(new RedirectFormBuku());
     dashboard.addActionListenerListPeminjamanBuku(new RedirectListPeminjaman());
+    dashboard.addActionListenerFormPeminjamanBuku(new RedirectFormPeminjaman());
     loginUI.getFrame().setVisible(true);
 
   }
@@ -473,16 +512,13 @@ public class Controller {
         LocalDate tanggalPinjam = rs.getDate("tanggal_pinjam").toLocalDate();
         Date tanggalKembali = rs.getDate("tanggal_kembali");
         Peminjaman peminjaman = new Peminjaman(buku, anggota, tanggalPinjam,
-            tanggalKembali, rs.getInt("durasi"));
+            tanggalKembali, rs.getInt("durasi"), rs.getInt("id"));
         peminjamanList.add(peminjaman);
       }
       dashboard.getFrame().getContentPane().removeAll();
-      dashboard.getFrame().setContentPane(dashboard.getPeminjamanList(peminjamanList, new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-          System.out.println("Hehe");
-        }
-      }));
+      dashboard.getFrame().setContentPane(
+          dashboard.getPeminjamanList(peminjamanList, new RedirectEditPeminjaman()));
+      dashboard.addActionListenerAddPeminjaman(new RedirectFormPeminjaman());
       dashboard.getFrame().revalidate();
       dashboard.getFrame().repaint();
 
@@ -491,4 +527,128 @@ public class Controller {
     }
   }
 
+  public void GetPeminjamanById(int id) {
+    try {
+      Statement stmt = conn.createStatement();
+      ResultSet rs = stmt.executeQuery(
+          "SELECT tb_peminjaman.id, tb_anggota.nama AS nama_anggota, tb_buku.nama_buku AS nama_buku, tb_peminjaman.tanggal_pinjam, tb_peminjaman.tanggal_kembali, tb_peminjaman.durasi FROM tb_peminjaman INNER JOIN tb_anggota ON tb_peminjaman.id_anggota = tb_anggota.id INNER JOIN tb_buku ON tb_peminjaman.id_buku = tb_buku.id WHERE tb_peminjaman.id = "
+              + id);
+      if (rs.next()) {
+        Buku buku = new Buku(0, rs.getString("nama_buku"), "", "", "");
+        Anggota anggota = new Anggota(0, rs.getString("nama_anggota"), "", "", 0, "");
+        Date tanggalPinjam = rs.getDate("tanggal_pinjam");
+        Date tanggalKembali = rs.getDate("tanggal_kembali");
+
+        ArrayList<Buku> bukuList = GetArrayListBuku();
+        ArrayList<Anggota> anggotaList = GetArrayListAnggota();
+
+        dashboard.getFrame().getContentPane().removeAll();
+        dashboard.getFrame()
+            .setContentPane(dashboard.getFormPeminjamanPanel(anggotaList, bukuList, new ActionListener() {
+              @Override
+              public void actionPerformed(ActionEvent e) {
+                java.util.Date utilDate = dashboard.getTanggalKembali();
+                java.sql.Date sqlDate = new java.sql.Date(utilDate.getTime());
+                UpdateTanggalKembali(id, sqlDate);
+              }
+            }));
+        dashboard.setBukuPeminjaman(buku.getNama_buku());
+        dashboard.setNamaPeminjam(anggota.getNama());
+        dashboard.setDurasiPeminjaman(rs.getInt("durasi"));
+        dashboard.setTanggalPinjam(tanggalPinjam);
+        dashboard.setTanggalKembali(tanggalKembali, tanggalPinjam);
+        dashboard.getFrame().revalidate();
+        dashboard.getFrame().repaint();
+      } else {
+        JOptionPane.showMessageDialog(null, "Peminjaman not found", "Error", JOptionPane.ERROR_MESSAGE);
+      }
+    } catch (SQLException e) {
+      Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, e.getMessage(), e);
+    }
+  }
+
+  public void AddPeminjaman(int idAnggota, int idBuku, int durasi, Date tanggalPinjam) {
+    try {
+      Statement stmt = conn.createStatement();
+      stmt.executeUpdate(
+          "INSERT INTO tb_peminjaman (id_anggota, id_buku, durasi, tanggal_pinjam) VALUES ('" + idAnggota + "', '"
+              + idBuku + "', '" + durasi + "', '" + tanggalPinjam + "')");
+
+      if (stmt.getUpdateCount() > 0) {
+        GetPeminjamanList();
+      } else {
+        JOptionPane.showMessageDialog(null, "Failed to add Peminjaman", "Error", JOptionPane.ERROR_MESSAGE);
+      }
+    } catch (SQLException e) {
+      Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, e.getMessage(), e);
+    }
+  }
+
+  public void UpdateTanggalKembali(int idPeminjaman, Date tanggalKembali) {
+    try {
+      Statement stmt = conn.createStatement();
+      stmt.executeUpdate("UPDATE tb_peminjaman SET tanggal_kembali = '" + tanggalKembali + "' WHERE id = '"
+          + idPeminjaman + "'");
+
+      if (stmt.getUpdateCount() > 0) {
+        GetPeminjamanList();
+      } else {
+        JOptionPane.showMessageDialog(null, "Failed to update Peminjaman", "Error", JOptionPane.ERROR_MESSAGE);
+      }
+    } catch (SQLException e) {
+      Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, e.getMessage(), e);
+    }
+  }
+
+  public ArrayList<Buku> GetArrayListBuku() {
+    ArrayList<Buku> bukuList = new ArrayList<Buku>();
+    try {
+      Statement stmt = conn.createStatement();
+      ResultSet rs = stmt.executeQuery("SELECT * FROM tb_buku");
+
+      while (rs.next()) {
+        Buku buku = new Buku(rs.getInt("id"), rs.getString("nama_buku"), rs.getString("penulis"), rs.getString("isbn"),
+            rs.getString("genre"));
+        bukuList.add(buku);
+      }
+    } catch (SQLException e) {
+      Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, e.getMessage(), e);
+    }
+    return bukuList;
+  }
+
+  public ArrayList<Anggota> GetArrayListAnggota() {
+    ArrayList<Anggota> anggotaList = new ArrayList<Anggota>();
+    try {
+      Statement stmt = conn.createStatement();
+      ResultSet rs = stmt.executeQuery("SELECT * FROM tb_anggota");
+
+      while (rs.next()) {
+        Anggota anggota = new Anggota(rs.getInt("id"), rs.getString("nama"), rs.getString("nim"),
+            rs.getString("jurusan"), rs.getInt("status"), rs.getString("email"));
+        anggotaList.add(anggota);
+      }
+    } catch (SQLException e) {
+      Logger.getLogger(Controller.class.getName()).log(Level.SEVERE, e.getMessage(), e);
+    }
+    return anggotaList;
+  }
+
+  public int findAnggotaIdByName(ArrayList<Anggota> anggotaList, String name) {
+    for (Anggota anggota : anggotaList) {
+      if (anggota.getNama().equals(name)) {
+        return anggota.getId();
+      }
+    }
+    return -1; // return -1 if anggota with given name is not found
+  }
+
+  public int findBukuIdByName(ArrayList<Buku> bukuList, String name) {
+    for (Buku buku : bukuList) {
+      if (buku.getNama_buku().equals(name)) {
+        return buku.getId();
+      }
+    }
+    return -1; // return -1 if buku with given name is not found
+  }
 }

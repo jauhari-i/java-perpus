@@ -9,13 +9,23 @@ public class Peminjaman {
   private LocalDate tanggalPinjam;
   private Date tanggalKembali;
   private int durasi;
+  private int id;
 
-  public Peminjaman(Buku buku, Anggota anggota, LocalDate tanggalPinjam, Date tanggalKembali, int durasi) {
+  public Peminjaman(Buku buku, Anggota anggota, LocalDate tanggalPinjam, Date tanggalKembali, int durasi, int id) {
     this.buku = buku;
     this.anggota = anggota;
     this.tanggalPinjam = tanggalPinjam;
     this.tanggalKembali = tanggalKembali;
     this.durasi = durasi;
+    this.id = id;
+  }
+
+  public int getId() {
+    return id;
+  }
+
+  public void setId(int id) {
+    this.id = id;
   }
 
   public Buku getBuku() {
@@ -36,7 +46,11 @@ public class Peminjaman {
 
   public String getStatusPeminjaman() {
     if (tanggalKembali == null) {
-      return "Belum Kembali";
+      if (isTerlambat()) {
+        return "Belum Kembali - Terlambat";
+      } else {
+        return "Aktif";
+      }
     } else {
       return "Sudah Kembali";
     }

@@ -1,9 +1,12 @@
 package ui;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
+
+import com.toedter.calendar.JDateChooser;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -12,8 +15,12 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 import model.Anggota;
 import model.Buku;
@@ -47,7 +54,6 @@ public class Dashboard {
       button.addActionListener(new ActionListener() {
         public void actionPerformed(ActionEvent e) {
           fireEditingStopped();
-
           listener.actionPerformed(
               new ActionEvent(this, ActionEvent.ACTION_PERFORMED, table.getValueAt(row, column).toString()));
         }
@@ -85,12 +91,45 @@ public class Dashboard {
     }
   }
 
+  public class StatusCellRenderer extends DefaultTableCellRenderer {
+    @Override
+    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+        int row, int column) {
+      Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+      if (value != null && value.equals("Sudah Kembali")) {
+        c.setForeground(Color.WHITE);
+        c.setBackground(Color.GREEN);
+        c.setFont(new Font("Arial", Font.BOLD, 12));
+      } else {
+        c.setBackground(table.getBackground());
+        c.setForeground(Color.BLACK);
+      }
+      return c;
+    }
+  }
+
+  public class TerlambatCellRenderer extends DefaultTableCellRenderer {
+    @Override
+    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+        int row, int column) {
+      Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+      if (value != null && value.equals("-")) {
+        c.setForeground(Color.BLACK);
+        c.setBackground(table.getBackground());
+      } else {
+        c.setForeground(Color.WHITE);
+        c.setBackground(Color.RED);
+        c.setFont(new Font("Arial", Font.BOLD, 12));
+      }
+      return c;
+    }
+  }
+
   private JFrame frame;
   private User user;
   private JMenu anggota;
   private JMenu buku;
   private JMenu peminjaman;
-  private JMenu laporan;
   private JMenu profile;
   private JMenuItem profileUser;
   private JMenuItem logout;
@@ -122,6 +161,11 @@ public class Dashboard {
   private JMenuItem formPeminjamanBuku;
   private JMenuItem listPeminjamanBuku;
   private JButton addPeminjamanButton;
+  private JComboBox<String> anggotaPeminjaman;
+  private JComboBox<String> bukuPeminjaman;
+  private JTextField durasiPeminjaman;
+  private JDateChooser tanggalPinjam;
+  private JDateChooser tanggalKembali;
 
   // Dashboard Menu & Constructor
 
@@ -276,7 +320,7 @@ public class Dashboard {
     c.gridx = 1;
     c.gridy = 1;
     c.gridwidth = 1;
-    c.anchor = GridBagConstraints.CENTER;
+    c.anchor = GridBagConstraints.WEST;
     c.insets = new Insets(5, 5, 5, 5);
     anggotaFormPanel.add(new JLabel("Nama: "), c);
     c.gridy++;
@@ -429,7 +473,7 @@ public class Dashboard {
     c.gridx = 1;
     c.gridy = 1;
     c.gridwidth = 1;
-    c.anchor = GridBagConstraints.CENTER;
+    c.anchor = GridBagConstraints.WEST;
     c.insets = new Insets(5, 5, 5, 5);
     bukuFormPanel.add(new JLabel("Nama Buku: "), c);
     c.gridy++;
@@ -489,12 +533,12 @@ public class Dashboard {
     searchPanel.add(addPeminjamanButton, BorderLayout.EAST);
     peminjamanListPanel.add(searchPanel, BorderLayout.PAGE_START);
 
-    String[] columnNames = { "No", "Nama Buku", "Nama Peminjam", "Tanggal Pinjam", "Tanggal Kembali", "Durasi",
+    String[] columnNames = { "ID", "Nama Buku", "Nama Peminjam", "Tanggal Pinjam", "Tanggal Kembali", "Durasi",
         "Status", "Keterlambatan", "Aksi" };
     Object[][] data = new Object[peminjamanList.size()][9];
     for (int i = 0; i < peminjamanList.size(); i++) {
       Peminjaman peminjaman = peminjamanList.get(i);
-      data[i][0] = i + 1;
+      data[i][0] = peminjaman.getId();
       data[i][1] = peminjaman.getBuku().getNama_buku();
       data[i][2] = peminjaman.getAnggota().getNama();
       data[i][3] = peminjaman.getTanggalPinjam();
@@ -514,16 +558,23 @@ public class Dashboard {
     DefaultTableModel peminjamanTable = new DefaultTableModel(data, columnNames) {
       @Override
       public boolean isCellEditable(int row, int column) {
-        return false;
+        if (column == 8) {
+          return true;
+        } else {
+          return false;
+        }
       }
     };
+
     JTable tablePeminjaman = new JTable(peminjamanTable);
     tablePeminjaman.getTableHeader().setFont(new Font("Arial", Font.BOLD, 12));
     tablePeminjaman.getTableHeader().setReorderingAllowed(false);
     tablePeminjaman.getTableHeader().setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
     tablePeminjaman.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Color.BLACK));
     tablePeminjaman.getColumn("Aksi").setCellRenderer(new ButtonRenderer());
-    tablePeminjaman.getColumn("Aksi").setCellEditor(new ButtonEditor(new JCheckBox(), listener, 8));
+    tablePeminjaman.getColumn("Aksi").setCellEditor(new ButtonEditor(new JCheckBox(), listener, 0));
+    tablePeminjaman.getColumn("Status").setCellRenderer(new StatusCellRenderer());
+    tablePeminjaman.getColumn("Keterlambatan").setCellRenderer(new TerlambatCellRenderer());
     tablePeminjaman.getFillsViewportHeight();
 
     TableColumn idColumn = tablePeminjaman.getColumnModel().getColumn(0);
@@ -539,6 +590,188 @@ public class Dashboard {
     peminjamanListPanel.add(scrollPane);
 
     return peminjamanListPanel;
+  }
+
+  public JPanel getFormPeminjamanPanel(ArrayList<Anggota> anggotaList, ArrayList<Buku> bukuList,
+      ActionListener listener) {
+    JPanel formPeminjamanListPanel = new JPanel(new GridBagLayout());
+    GridBagConstraints c = new GridBagConstraints();
+
+    c.gridx = 0;
+    c.gridy = 0;
+    c.anchor = GridBagConstraints.CENTER;
+    c.gridwidth = 3;
+    JLabel titleLabel = new JLabel("Form Peminjaman Buku");
+    titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
+    formPeminjamanListPanel.add(titleLabel, c);
+
+    c.gridx = 1;
+    c.gridy = 1;
+    c.gridwidth = 1;
+    c.anchor = GridBagConstraints.WEST;
+    c.insets = new Insets(5, 5, 5, 5);
+    formPeminjamanListPanel.add(new JLabel("Nama Peminjam: "), c);
+    c.gridy++;
+    formPeminjamanListPanel.add(new JLabel("Nama Buku: "), c);
+    c.gridy++;
+    formPeminjamanListPanel.add(new JLabel("Durasi Peminjaman: "), c);
+    c.gridy++;
+    formPeminjamanListPanel.add(new JLabel("Tanggal Pinjam: "), c);
+    c.gridy++;
+    formPeminjamanListPanel.add(new JLabel("Tanggal Kembali: "), c);
+
+    c.gridx = 2;
+    c.gridy = 1;
+    c.anchor = GridBagConstraints.CENTER;
+    anggotaPeminjaman = new JComboBox<String>();
+    anggotaPeminjaman.setPreferredSize(new Dimension(25 * 10, anggotaPeminjaman.getPreferredSize().height));
+    for (int i = 0; i < anggotaList.size(); i++) {
+      anggotaPeminjaman.addItem(anggotaList.get(i).getNama());
+    }
+    formPeminjamanListPanel.add(anggotaPeminjaman, c);
+    c.gridy++;
+    bukuPeminjaman = new JComboBox<String>();
+    bukuPeminjaman.setPreferredSize(new Dimension(25 * 10, bukuPeminjaman.getPreferredSize().height));
+    for (int i = 0; i < bukuList.size(); i++) {
+      bukuPeminjaman.addItem(bukuList.get(i).getNama_buku());
+    }
+    formPeminjamanListPanel.add(bukuPeminjaman, c);
+    c.gridy++;
+    durasiPeminjaman = new JTextField(20);
+    durasiPeminjaman.addKeyListener(new KeyAdapter() {
+      public void keyTyped(KeyEvent e) {
+        char c = e.getKeyChar();
+        if (!(Character.isDigit(c) || c == KeyEvent.VK_BACK_SPACE || c == KeyEvent.VK_DELETE)) {
+          e.consume();
+        }
+      }
+    });
+
+    formPeminjamanListPanel.add(durasiPeminjaman, c);
+    c.gridy++;
+    tanggalPinjam = new JDateChooser();
+    tanggalPinjam.setDateFormatString("dd-MM-yyyy");
+    tanggalPinjam.setPreferredSize(new Dimension(25 * 10, tanggalPinjam.getPreferredSize().height));
+    tanggalPinjam.setMinSelectableDate(new Date());
+    formPeminjamanListPanel.add(tanggalPinjam, c);
+    c.gridy++;
+    tanggalKembali = new JDateChooser();
+    tanggalKembali.setDateFormatString("dd-MM-yyyy");
+    tanggalKembali.setPreferredSize(new Dimension(25 * 10, tanggalKembali.getPreferredSize().height));
+    tanggalKembali.setMinSelectableDate(new Date());
+    tanggalKembali.setEnabled(false);
+    formPeminjamanListPanel.add(tanggalKembali, c);
+
+    c.gridx = 0;
+    c.gridy++;
+    c.gridwidth = 3;
+    c.anchor = GridBagConstraints.CENTER;
+    submitButton = new JButton("Submit");
+    submitButton.addActionListener(listener);
+    formPeminjamanListPanel.add(submitButton, c);
+
+    durasiPeminjaman.addPropertyChangeListener(new PropertyChangeListener() {
+      @Override
+      public void propertyChange(PropertyChangeEvent evt) {
+        if ("date".equals(evt.getPropertyName())) {
+          Date tanggalPinjamValue = (Date) evt.getNewValue();
+          int durasiPeminjamanValue = getDurasiPeminjaman();
+          Calendar calendar = Calendar.getInstance();
+          calendar.setTime(tanggalPinjamValue);
+          calendar.add(Calendar.DATE, durasiPeminjamanValue);
+          tanggalKembali.setDate(calendar.getTime());
+        }
+      }
+    });
+
+    tanggalPinjam.getDateEditor().addPropertyChangeListener(new PropertyChangeListener() {
+      @Override
+      public void propertyChange(PropertyChangeEvent evt) {
+        if ("date".equals(evt.getPropertyName())) {
+          Date tanggalPinjamValue = (Date) evt.getNewValue();
+          int durasiPeminjamanValue = getDurasiPeminjaman();
+          Calendar calendar = Calendar.getInstance();
+          calendar.setTime(tanggalPinjamValue);
+          calendar.add(Calendar.DATE, durasiPeminjamanValue);
+          tanggalKembali.setDate(calendar.getTime());
+        }
+      }
+    });
+    formPeminjamanListPanel.addKeyListener(new KeyAdapter() {
+      public void keyPressed(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+          submitButton.doClick();
+        }
+      }
+    });
+
+    return formPeminjamanListPanel;
+  }
+
+  // Get Peminjaman Form Value
+
+  public String getNamaPeminjam() {
+    return anggotaPeminjaman.getSelectedItem().toString();
+  }
+
+  public String getNamaBukuPeminjaman() {
+    return bukuPeminjaman.getSelectedItem().toString();
+  }
+
+  public int getDurasiPeminjaman() {
+    String durasi = durasiPeminjaman.getText();
+    return Integer.parseInt(durasi);
+  }
+
+  public Date getTanggalPinjam() {
+    return tanggalPinjam.getDate();
+  }
+
+  public Date getTanggalKembali() {
+    return tanggalKembali.getDate();
+  }
+
+  // Set Peminjaman Form Value
+
+  public void setNamaPeminjam(String nama) {
+    anggotaPeminjaman.setSelectedItem(nama);
+    anggotaPeminjaman.setEnabled(false);
+  }
+
+  public void setBukuPeminjaman(String buku) {
+    bukuPeminjaman.setSelectedItem(buku);
+    bukuPeminjaman.setEnabled(false);
+  }
+
+  public void setDurasiPeminjaman(int durasi) {
+    durasiPeminjaman.setText(Integer.toString(durasi));
+    durasiPeminjaman.setEnabled(false);
+  }
+
+  public void setTanggalPinjam(Date tanggal) {
+    tanggalPinjam.setDate(tanggal);
+    tanggalPinjam.setEnabled(false);
+    tanggalKembali.setEnabled(true);
+  }
+
+  public void setTanggalKembali(Date tanggal, Date tglPinjam) {
+    tanggalKembali.setDate(tanggal);
+    tanggalKembali.setMinSelectableDate(tglPinjam);
+    tanggalKembali.setEnabled(true);
+  }
+
+  // Reset Value
+
+  public void resetPeminjamanFormValue() {
+    anggotaPeminjaman.setSelectedIndex(0);
+    bukuPeminjaman.setSelectedIndex(0);
+    durasiPeminjaman.setText("");
+    tanggalPinjam.setDate(new Date());
+
+    anggotaPeminjaman.setEnabled(true);
+    bukuPeminjaman.setEnabled(true);
+    durasiPeminjaman.setEnabled(true);
+    tanggalPinjam.setEnabled(true);
   }
 
   // Get Buku Form Value
@@ -689,6 +922,10 @@ public class Dashboard {
 
   public void addActionListenerListPeminjamanBuku(ActionListener listener) {
     listPeminjamanBuku.addActionListener(listener);
+  }
+
+  public void addActionListenerAddPeminjaman(ActionListener listener) {
+    addPeminjamanButton.addActionListener(listener);
   }
 
   // Set User Data For Header

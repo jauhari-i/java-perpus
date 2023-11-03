@@ -4,5 +4,6 @@
     "java.project.referencedLibraries": [
         "lib/**/*.jar",
         "/Users/jauhari/Downloads/**/*.jar"
-    ]
+    ],
+    "java.debug.settings.hotCodeReplace": "auto"
 }
